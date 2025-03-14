@@ -27,6 +27,7 @@ I = EinDim('1', 1)
 class einShape:
 
   def __init__(self, *dims):
+    dims = tuple(EinDim(str(d), d)  if isinstance(d, int) else d for d in dims)
     self.dims = dims
     self.shape = tuple(map(lambda x: x.size, dims))
 
@@ -35,7 +36,8 @@ class einShape:
   def permute(self, order):
     assert len(order) == len(self.dims)
     return einShape(*[self.dims[i] for i in order])
-  def broadcast (self, other): return einShape(*(list(dict.fromkeys(self.dims + other.dims))))
+
+  def common (self, *others): return einShape(*list(dict.fromkeys(sum([d.dims for d in [self, *others]], tuple()))))
   def __eq__(self, other): return self.dims == other.dims
 
 tensor_att = ['dtype', 'lazydata', 'numpy', 'shape']
@@ -51,6 +53,8 @@ def create_generatator(fn):
 fns = []
 
 
+
+
 class EinTensor():
   def __init__(self, shape:einShape, data:Tensor):
     assert shape.shape == data.shape
@@ -63,9 +67,17 @@ class EinTensor():
   randn = create_generatator(Tensor.randn)
   randint = create_generatator(Tensor.randint)
 
+  arange = create_generatator(Tensor.arange)
+
+  def linspace(start, end, dim): return EinTensor(einShape(dim), Tensor.linspace(start, end, dim.size))
+
+
+
+  def stack(*tensors, dim:EinDim = None):
+    l = len(tensors)
+    if dim is None: dim = EinDim(f'StackDim:{l}', l)
+
   def __repr__(self): return f'<einTensor [{', '.join(map(lambda x: x.name, self.einshape.dims))}]>'
-
-
 
   def expand(self, newshape):
     sparse_shape = einShape(*(self.einshape.dims + (I,) * (len(newshape.dims) - len(self.einshape.dims))))
@@ -80,15 +92,17 @@ class EinTensor():
       return getattr(self.data, name)
     return super().__getattribute__(name)
 
+
+
 def create_elementwise(fn):
-  def wrapped (one, other):
+  def wrapped (one:EinTensor, other):
     if (type(other) == int or type(other) == float):
       val = other
-      other = EinTensor.ones([])
+      other = EinTensor.ones()
       other.data *= val
-    shape = one.einshape.broadcast(other.einshape)
+    shape = one.einshape.common(other.einshape)
     return EinTensor(
-      one.einshape.broadcast(other.einshape),
+      one.einshape.common(other.einshape),
       fn(one.expand(shape).data, other.expand(shape).data))
   return wrapped
 
@@ -124,3 +138,6 @@ if __name__ == '__main__':
 
   print((x * w).sum(EinDim))
   print((x * w).sum_to(Nsamples, Out))
+
+  print (x * 2)
+
