@@ -1,8 +1,6 @@
 
 a sane way to handle many dimensions on Tensors
 
-
-
 ```python
 from eintensor import EinTensor, EinDim
 
@@ -16,3 +14,5 @@ pred = (x * w).sum_to(SeqLen, BatchSize, EmbeddingDim)
 print(pred)         # <EinTensor [SeqLen, BatchSize, EmbeddingDim]>
 print(pred.shape)   # (100, 20, 30)
 ```
+
+[read the docs](https://dkormann.com/eintensor)
