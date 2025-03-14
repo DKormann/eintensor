@@ -1,4 +1,6 @@
 
+
+## idea
 a sane way to handle many dimensions on Tensors
 eintensor is using (tinygrad)[github.com/tinygrad/tinygrad] under the hood
 
@@ -23,7 +25,7 @@ Its possible but outdated.
 
 Tensor dimensions should be named entities. You should think about the dimension on a high level and the compiler cares about ordering (reshaping, permuting, unsqueezing) the dimensions.
 
-### EinDim
+## EinDim
 
 an EinDim is an object that represents the data dimension. it has a name and size
 
@@ -31,7 +33,7 @@ an EinDim is an object that represents the data dimension. it has a name and siz
 K, V = EinDim('K', 10), EinDim('V', 20)
 ```
 
-### EinTensor
+## EinTensor
 
 #### create
 
@@ -46,7 +48,7 @@ R = EinTensor.rand(K, V)
 
 unary operations work as expected from Tensor
 
-#### binary
+### binary
 
 you can perform binary operations on any two EinTensors.
 If they share dimensions the operation is broadcasted on the shared dimensions.
@@ -63,11 +65,12 @@ S = EinDim('S', 30)
 y = O + EinTensor.ones(K, S) # einshape: (K, V, S)
 ```
 
-#### reduce
+### reduce
 
 reduce operations come in to flavors:
 
 `x.sum(K)` will sum along the  K dimension
+
 `x.sum_to(K,S)` will sum all other dimensions to get resulting dimension (K,) 
 
 
