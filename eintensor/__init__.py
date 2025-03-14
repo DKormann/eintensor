@@ -1,2 +1,2 @@
 
-from eintensor.shape import EinTensor, einShape, einDim
+from eintensor.shape import EinTensor, einShape, EinDim

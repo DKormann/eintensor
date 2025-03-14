@@ -1,15 +1,15 @@
 import unittest
-from eintensor import EinTensor, einShape, einDim
+from eintensor import EinTensor, einShape, EinDim
 
-K,V,S,T = einDim('K', 3), einDim('V', 5), einDim('S', 7), einDim('T', 11)
+K,V,S,T = EinDim('K', 3), EinDim('V', 5), EinDim('S', 7), EinDim('T', 11)
 
-x = EinTensor.ones((K,V))
-y = EinTensor.ones((K,S,T))
+x = EinTensor.ones(K,V)
+y = EinTensor.ones(K,S,T)
 
 class TestEinTensor(unittest.TestCase):
 
   def test_ones(self):
-    x = EinTensor.ones((K,V))
+    x = EinTensor.ones(K,V)
     self.assertEqual(x.einshape, einShape(K,V), f'expected shape {einShape(K,V)} but got {x.einshape}')
   
   def test_binary(self):
