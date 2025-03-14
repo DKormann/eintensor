@@ -9,3 +9,4 @@ w = EinTensor.rand(FeatureDim, EmbeddingDim)
 pred = (x * w).sum_to(SeqLen, BatchSize, EmbeddingDim)
 
 print(pred)
+print(pred.shape)
