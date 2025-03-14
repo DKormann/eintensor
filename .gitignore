@@ -1,4 +1,3 @@
-**/__pycache__/
-.vscode
-/temp
-tinsor.egg-info
+.pytest_cache
+*.egg-info
+**/__pycache__
