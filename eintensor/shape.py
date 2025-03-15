@@ -63,6 +63,8 @@ fns = []
 
 class EinTensor():
   def __init__(self, shape:einShape, data:Tensor):
+    if not isinstance(shape, einShape): shape = einShape(*shape)
+    if not isinstance(data, Tensor): data = Tensor(data)
     assert shape.shape == data.shape
     self.einshape = shape
     self.data = data
@@ -78,7 +80,6 @@ class EinTensor():
   def linspace(start, end, dim): return EinTensor(einShape(dim), Tensor.linspace(start, end, dim.size))
 
   def stack(*tensors, dim:EinDim = None):
-    print(tensors)
     l = len(tensors)
     if dim is None: dim = EinDim(f'StackDim:{l}', l)
     assert dim.size == l, f"Dimension {dim} must have size {l}"
@@ -124,14 +125,16 @@ def create_elementwise(fn):
   return wrapped
 
 
-binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__]
+binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__] \
+  + ['__pow__']
+
 
 for op in binary_ops:
-  fn = getattr(SimpleMathTrait, op)
+  fn = getattr(Tensor, op)
   setattr(EinTensor, op, create_elementwise(fn))
 
-unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool']
-for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x: EinTensor(x.einshape, getattr(x.data, name)()))(op))
+unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', 'clamp']
+for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x, *args: EinTensor(x.einshape, getattr(x.data, name)(*args)))(op))
 
 def create_reduce(fn, inverse = False):
   def wrapped (x, *axes:tuple[EinDim]):
