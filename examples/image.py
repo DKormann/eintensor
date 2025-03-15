@@ -13,6 +13,10 @@ y = EinTensor.linspace(0, 255, Width)
 
 x = x + y
 
+print(x)
+
+print(x.stack(x))
+
 
 arr = x.numpy().astype('uint8')
 print(arr[0,0], arr[-1,-1])

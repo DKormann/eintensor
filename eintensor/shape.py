@@ -1,5 +1,6 @@
 from tinygrad import Tensor
 from tinygrad.ops import SimpleMathTrait
+import math
 _dimensions = {}
 
 class EinDim:
@@ -27,9 +28,10 @@ I = EinDim('1', 1)
 class einShape:
 
   def __init__(self, *dims):
-    dims = tuple(EinDim(str(d), d)  if isinstance(d, int) else d for d in dims)
+    dims = tuple( EinDim(str(d), d)  if isinstance(d, int) else d for d in dims)
     self.dims = dims
     self.shape = tuple(map(lambda x: x.size, dims))
+    self.numel = math.prod(self.shape)
 
   def __repr__(self):return f'einShape{self.dims}'
 
@@ -37,7 +39,12 @@ class einShape:
     assert len(order) == len(self.dims)
     return einShape(*[self.dims[i] for i in order])
 
-  def common (self, *others): return einShape(*list(dict.fromkeys(sum([d.dims for d in [self, *others]], tuple()))))
+  def union (self, *others): return einShape(*list(dict.fromkeys(sum([d.dims for d in [self, *others]], tuple()))))
+  def inter (self, *others): return einShape(*[d for d in self.dims if all(d in o.dims for o in others)])
+
+  def add(self, *dims): return einShape(*list(dict.fromkeys(self.dims + dims)))
+  def remove(self, *dims): return einShape(*[d for d in self.dims if d not in dims])
+
   def __eq__(self, other): return self.dims == other.dims
 
 tensor_att = ['dtype', 'lazydata', 'numpy', 'shape']
@@ -51,8 +58,6 @@ def create_generatator(fn):
 
 
 fns = []
-
-
 
 
 class EinTensor():
@@ -71,17 +76,35 @@ class EinTensor():
 
   def linspace(start, end, dim): return EinTensor(einShape(dim), Tensor.linspace(start, end, dim.size))
 
-
-
   def stack(*tensors, dim:EinDim = None):
     l = len(tensors)
     if dim is None: dim = EinDim(f'StackDim:{l}', l)
+    assert dim.size == l, f"Dimension {dim} must have size {l}"
+    newshape = einShape.union(*[t.einshape for t in tensors])
+    tds = [t.expand(newshape).data.expand(newshape.shape) for t in tensors]
+    return EinTensor(einShape(*((dim,) + newshape.dims)), Tensor.stack(*tds))
+  
+  # def concat(self, other:EinTensor, selfdim, otherdim = None, newdim = None):
+  #   if otherdim is None: otherdim = selfdim
+  #   catsize = selfdim.size + otherdim.size
+  #   if newdim is None: newdim = EinDim(f"ConcatDim_{catsize}", catsize)
+  #   assert newdim.size == catsize, f"Dimension {newdim} must have size {catsize}"
+  #   assert selfdim in self.einshape.dims, f"Dimension {selfdim} not found in {self.einshape}"
+  #   assert otherdim in other.einshape.dims, f"Dimension {otherdim} not found in {other.einshape}"
+  #   restidms = einShape.union(self.einshape.remove(selfdim), other.einshape.remove(otherdim))
+  #   self = self.expand(restidms.add(selfdim))
+  #   other = other.expand(restidms.add(otherdim))
+  #   # return EinTensor(restidms.add(newdim)
 
   def __repr__(self): return f'<einTensor [{', '.join(map(lambda x: x.name, self.einshape.dims))}]>'
 
+  def reshape(self, einshape:einShape):
+    assert self.einshape.numel == einshape.numel, f"Cannot reshape {self.einshape} to {einshape}, {self.einshape.numel} != {einshape.numel}"
+    return EinTensor(einshape, self.data.reshape(einshape.shape))
+
   def expand(self, newshape):
     sparse_shape = einShape(*(self.einshape.dims + (I,) * (len(newshape.dims) - len(self.einshape.dims))))
-    reshaped = EinTensor(sparse_shape, self.data.reshape(sparse_shape.shape))
+    reshaped = self.reshape(sparse_shape)
 
     extra = len(self.einshape.dims)-1
     order = [self.einshape.dims.index(k) if k in self.einshape.dims else (extra := extra + 1) for k in newshape.dims]
@@ -92,17 +115,15 @@ class EinTensor():
       return getattr(self.data, name)
     return super().__getattribute__(name)
 
-
-
 def create_elementwise(fn):
   def wrapped (one:EinTensor, other):
     if (type(other) == int or type(other) == float):
       val = other
       other = EinTensor.ones()
       other.data *= val
-    shape = one.einshape.common(other.einshape)
+    shape = one.einshape.union(other.einshape)
     return EinTensor(
-      one.einshape.common(other.einshape),
+      one.einshape.union(other.einshape),
       fn(one.expand(shape).data, other.expand(shape).data))
   return wrapped
 
@@ -123,7 +144,6 @@ def create_reduce(fn, inverse = False):
       fn(x.data, [x.einshape.dims.index(k) for k in axes]))
   return wrapped
 
-
 for op in reduce_ops:
   setattr(EinTensor, op, create_reduce(getattr(Tensor, op)))
   setattr(EinTensor, f'{op}_to', create_reduce(getattr(Tensor, op), True))
@@ -131,13 +151,13 @@ for op in reduce_ops:
 if __name__ == '__main__':
   K,V,S,T = EinDim('K', 3), EinDim('V', 5), EinDim('S', 7), EinDim('T', 11)
 
-  EinDim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
+  Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
 
-  x = EinTensor.ones(Nsamples, EinDim)
-  w = EinTensor.ones(EinDim, Out)
+  x = EinTensor.ones(Nsamples, Dim)
+  w = EinTensor.ones(Dim, Out)
 
-  print((x * w).sum(EinDim))
-  print((x * w).sum_to(Nsamples, Out))
+  print(x.stack(w))
+  print(x.stack(EinTensor.ones(Dim, Nsamples)))
 
-  print (x * 2)
+
 
