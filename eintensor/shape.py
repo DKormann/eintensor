@@ -112,6 +112,13 @@ class EinTensor():
       return getattr(self.data, name)
     return super().__getattribute__(name)
 
+  
+  def clamp(self, min = None, max = None):
+    if min is not None: self = self.maximum(min)
+    if max is not None: self = self.minimum(max)
+    return self
+    
+
 def create_elementwise(fn):
   def wrapped (one:EinTensor, other):
     if (type(other) == int or type(other) == float):
@@ -125,15 +132,17 @@ def create_elementwise(fn):
   return wrapped
 
 
+
+
 binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__] \
-  + ['__pow__']
+  + ['__pow__', 'minimum', 'maximum']
 
 
 for op in binary_ops:
   fn = getattr(Tensor, op)
   setattr(EinTensor, op, create_elementwise(fn))
 
-unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', 'clamp']
+unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt']
 for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x, *args: EinTensor(x.einshape, getattr(x.data, name)(*args)))(op))
 
 def create_reduce(fn, inverse = False):

@@ -2,23 +2,19 @@ from PIL import Image
 from eintensor import EinTensor, EinDim
 
 Width, Height = EinDim('Width', 100), EinDim('Height', 100)
-
 RGB = EinDim('RGB', 3)
 
-X = EinTensor.linspace(0, 1, Height)
+X = EinTensor.linspace(-1, 1, Height)
 Y = X.reshape(Width)
 
 XY = X.stack(Y)
-XY = XY * 2 - 1 # 0 at the center
-
-dist = (XY ** 2).sum_to(Width, Height).sqrt()
-dist = 1-dist.clamp(0,1)
+dist =  (XY ** 2).sum_to(Width, Height).sqrt()
 
 color = EinTensor([RGB], [0,255,255])
-
-x = dist * color
+x = color * (1-dist.clamp(0,1))
 
 arr = x.permute(Width, Height, RGB).numpy().astype('uint8')
 img = Image.fromarray(arr, 'RGB')
-img.save('./img.jpg')
+
+img.save(__file__[:-3]+'.jpg')
 

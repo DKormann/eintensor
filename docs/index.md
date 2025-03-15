@@ -73,7 +73,15 @@ reduce operations come in to flavors:
 
 `x.sum_to(K,S)` will sum all other dimensions to get resulting dimension (K,) 
 
+### stack
 
-### ternary
+you can stack any number of any tensors together you will get a new stack dimension or can provide a dimension. All tensors will be expanded to the same shape.
 
-TODO
+```
+# this will create EinTensor of shape (StackDimension:2, K, V, S)
+
+EinTensor.stack(
+  EinTensor.ones(K,V),
+  EinTensor.ones(V,S),
+)
+```
