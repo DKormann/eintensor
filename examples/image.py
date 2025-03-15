@@ -7,22 +7,12 @@ from eintensor import EinTensor, EinDim
 Width, Height = EinDim('Width', 100), EinDim('Height', 100)
 
 
-x = EinTensor.zeros(Width, Height,3)
-y = EinTensor.linspace(0, 255, Width)
+R = EinTensor.linspace(0, 255, Width)
+G = EinTensor.linspace(0, 255, Height)
 
+x = EinTensor.stack(R, G, G*0, dim= (RGB:=EinDim('RGB', 3)))
 
-x = x + y
-
-print(x)
-
-print(x.stack(x))
-
-
-arr = x.numpy().astype('uint8')
-print(arr[0,0], arr[-1,-1])
-
+arr = x.permute(Width, Height, RGB).numpy().astype('uint8')
 img = Image.fromarray(arr, 'RGB')
-
-
 img.save('./img.jpg')
 

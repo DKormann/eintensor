@@ -60,6 +60,7 @@ def create_generatator(fn):
 fns = []
 
 
+
 class EinTensor():
   def __init__(self, shape:einShape, data:Tensor):
     assert shape.shape == data.shape
@@ -77,38 +78,33 @@ class EinTensor():
   def linspace(start, end, dim): return EinTensor(einShape(dim), Tensor.linspace(start, end, dim.size))
 
   def stack(*tensors, dim:EinDim = None):
+    print(tensors)
     l = len(tensors)
     if dim is None: dim = EinDim(f'StackDim:{l}', l)
     assert dim.size == l, f"Dimension {dim} must have size {l}"
     newshape = einShape.union(*[t.einshape for t in tensors])
-    tds = [t.expand(newshape).data.expand(newshape.shape) for t in tensors]
+    tds = [t.expand(*newshape.dims).data.expand(newshape.shape) for t in tensors]
     return EinTensor(einShape(*((dim,) + newshape.dims)), Tensor.stack(*tds))
   
-  # def concat(self, other:EinTensor, selfdim, otherdim = None, newdim = None):
-  #   if otherdim is None: otherdim = selfdim
-  #   catsize = selfdim.size + otherdim.size
-  #   if newdim is None: newdim = EinDim(f"ConcatDim_{catsize}", catsize)
-  #   assert newdim.size == catsize, f"Dimension {newdim} must have size {catsize}"
-  #   assert selfdim in self.einshape.dims, f"Dimension {selfdim} not found in {self.einshape}"
-  #   assert otherdim in other.einshape.dims, f"Dimension {otherdim} not found in {other.einshape}"
-  #   restidms = einShape.union(self.einshape.remove(selfdim), other.einshape.remove(otherdim))
-  #   self = self.expand(restidms.add(selfdim))
-  #   other = other.expand(restidms.add(otherdim))
-  #   # return EinTensor(restidms.add(newdim)
-
   def __repr__(self): return f'<einTensor [{', '.join(map(lambda x: x.name, self.einshape.dims))}]>'
 
-  def reshape(self, einshape:einShape):
+  def reshape(self, *einshape:tuple[EinDim]):
+    einshape = einShape(*einshape)
     assert self.einshape.numel == einshape.numel, f"Cannot reshape {self.einshape} to {einshape}, {self.einshape.numel} != {einshape.numel}"
     return EinTensor(einshape, self.data.reshape(einshape.shape))
 
-  def expand(self, newshape):
-    sparse_shape = einShape(*(self.einshape.dims + (I,) * (len(newshape.dims) - len(self.einshape.dims))))
-    reshaped = self.reshape(sparse_shape)
-
+  def expand(self, *dims:tuple[EinDim]):
+    newshape = einShape(*dims)
+    sparse_shape = (self.einshape.dims + (I,) * (len(newshape.dims) - len(self.einshape.dims)))
+    reshaped = self.reshape(*sparse_shape)
     extra = len(self.einshape.dims)-1
     order = [self.einshape.dims.index(k) if k in self.einshape.dims else (extra := extra + 1) for k in newshape.dims]
-    return EinTensor(reshaped.einshape.permute(order), reshaped.data.permute(order))
+    return EinTensor(newshape, reshaped.data.permute(order).expand(newshape.shape))
+  
+  def permute(self, *dims:EinDim):
+    assert len(dims) == len(self.einshape.dims)
+    order = [self.einshape.dims.index(k) for k in dims]
+    return EinTensor(self.einshape.permute(order), self.data.permute(order))
   
   def __getattribute__(self, name):
     if name in tensor_att:
@@ -124,8 +120,9 @@ def create_elementwise(fn):
     shape = one.einshape.union(other.einshape)
     return EinTensor(
       one.einshape.union(other.einshape),
-      fn(one.expand(shape).data, other.expand(shape).data))
+      fn(one.expand(*shape.dims).data, other.expand(*shape.dims).data))
   return wrapped
+
 
 binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__]
 

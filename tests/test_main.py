@@ -12,6 +12,7 @@ class TestEinTensor(unittest.TestCase):
     x = EinTensor.ones(K,V)
     self.assertEqual(x.einshape, einShape(K,V), f'expected shape {einShape(K,V)} but got {x.einshape}')
   
+
   def test_binary(self):
 
     lams = [
@@ -49,14 +50,22 @@ class TestEinTensor(unittest.TestCase):
     assert x.dtype == x.data.dtype
 
   def test_expand(self):
+
+    assert x.expand(K,V,S,T).einshape == einShape(K,V,S,T), f'expected shape {einShape(K,V,S,T)} but got {x.expand(K,V,S,T).einshape}'
     self.assertEqual((x + y).einshape ,einShape(K,V,S,T))
     self.assertEqual((x - y).einshape ,einShape(K,V,S,T))
     self.assertEqual((x * y).einshape ,einShape(K,V,S,T))
   
-
+  def test_permute(self):
+    xp = x.permute(V,K)
+    assert xp.einshape == einShape(V,K), f'expected shape {einShape(V,K)} but got {xp.einshape}'
+    assert xp.data.shape == xp.einshape.shape, f'expected shape {xp.einshape.shape} but got {xp.data.shape}'
+   
   def test_dtype(self):
     assert x.dtype == x.data.dtype
     assert (x.numpy() == x.data.numpy()).all()
+
+
     
 
 
