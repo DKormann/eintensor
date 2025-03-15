@@ -1,8 +1,12 @@
 
 
+[code](https://github.com/dkormann/eintensor)
+
 ## idea
 a sane way to handle many dimensions on Tensors
-eintensor is using (tinygrad)[github.com/tinygrad/tinygrad] under the hood
+eintensor is using [tinygrad](github.com/tinygrad/tinygrad) under the hood
+
+
 
 hello world:
 ```python
