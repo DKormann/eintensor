@@ -24,7 +24,6 @@ class EinDim:
 
 I = EinDim('1', 1)
 
-
 class einShape:
 
   def __init__(self, *dims):
@@ -47,8 +46,11 @@ class einShape:
 
   def __eq__(self, other): return self.dims == other.dims
 
-tensor_att = ['dtype', 'lazydata', 'numpy', 'shape']
+tensor_att = ['dtype', 'lazydata', 'numpy', 'shape', 'requires_grad']
+tensor_fns = ['backward']
 reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var']
+unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt']
+
 
 def create_generatator(fn):
   def wrapped(*shape, **kwargs):
@@ -56,17 +58,14 @@ def create_generatator(fn):
     return EinTensor(einshape, fn(*einshape.shape, **kwargs))
   return wrapped
 
-
 fns = []
-
-
 
 class EinTensor():
   def __init__(self, shape:einShape, data:Tensor):
     if not isinstance(shape, einShape): shape = einShape(*shape)
     if not isinstance(data, Tensor): data = Tensor(data)
     assert shape.shape == data.shape
-    self.einshape = shape
+    self.einshape:einShape = shape
     self.data = data
 
   ones = create_generatator(Tensor.ones)
@@ -80,6 +79,7 @@ class EinTensor():
   def linspace(start, end, dim): return EinTensor(einShape(dim), Tensor.linspace(start, end, dim.size))
 
   def stack(*tensors, dim:EinDim = None):
+
     l = len(tensors)
     if dim is None: dim = EinDim(f'StackDim:{l}', l)
     assert dim.size == l, f"Dimension {dim} must have size {l}"
@@ -106,18 +106,33 @@ class EinTensor():
     assert len(dims) == len(self.einshape.dims)
     order = [self.einshape.dims.index(k) for k in dims]
     return EinTensor(self.einshape.permute(order), self.data.permute(order))
-  
+
+  def wrap_tensor(self, tensor):
+    if isinstance(tensor, Tensor) and tensor.shape == self.shape: return EinTensor(self.einshape, tensor)
+    return tensor
   def __getattribute__(self, name):
-    if name in tensor_att:
-      return getattr(self.data, name)
+    if name in tensor_att:return self.wrap_tensor(getattr(self.data, name))
+    if name in tensor_fns:
+      fn = getattr(self.data, name)
+      def wrapper(*args, **kwargs):
+        return self.wrap_tensor(fn(*args, **kwargs))
+
     return super().__getattribute__(name)
 
-  
   def clamp(self, min = None, max = None):
     if min is not None: self = self.maximum(min)
     if max is not None: self = self.minimum(max)
     return self
-    
+  
+  def backward(self): return EinTensor(self.shape, self.data.backward())
+
+  @property
+  def grad(self):
+    g = self.data.grad
+    return g if g is None else EinTensor(self.shape, g)
+  
+
+  def __matmul__(self, other): return (self * other).sum(*self.einshape.inter(other.einshape).dims)
 
 def create_elementwise(fn):
   def wrapped (one:EinTensor, other):
@@ -131,9 +146,6 @@ def create_elementwise(fn):
       fn(one.expand(*shape.dims).data, other.expand(*shape.dims).data))
   return wrapped
 
-
-
-
 binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__] \
   + ['__pow__', 'minimum', 'maximum']
 
@@ -142,12 +154,11 @@ for op in binary_ops:
   fn = getattr(Tensor, op)
   setattr(EinTensor, op, create_elementwise(fn))
 
-unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt']
 for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x, *args: EinTensor(x.einshape, getattr(x.data, name)(*args)))(op))
 
 def create_reduce(fn, inverse = False):
   def wrapped (x, *axes:tuple[EinDim]):
-    if axes == []: axes = x.einshape.dims
+    if len(axes) == 0: axes = x.einshape.dims
     if inverse: axes = [d for d in x.einshape.dims if d not in axes]
     return EinTensor(einShape(*[k for k in x.einshape.dims if k not in axes]),
       fn(x.data, [x.einshape.dims.index(k) for k in axes]))
