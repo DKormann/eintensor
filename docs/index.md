@@ -89,3 +89,6 @@ EinTensor.stack(
   EinTensor.ones(V,S),
 )
 ```
+
+
+[examples](https://github.com/dkormann/eintensor)
