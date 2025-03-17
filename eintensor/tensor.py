@@ -19,7 +19,7 @@ class EinDim:
   def __repr__(self): return self.name
   def __eq__(self, other):
     
-    return self.size == other.size and self.name == other.name
+    return isinstance(other, EinDim) and self.size == other.size and self.name == other.name
   def __hash__(self): return hash(self.name)
   def copy(self):
     ctr=1
@@ -37,6 +37,7 @@ class einShape:
     dims = tuple( EinDim(str(d), d)  if isinstance(d, int) else d for d in dims)
     self.dims = dims
     self.shape = tuple(map(lambda x: x.size, dims))
+    assert all(type(s)==int for s in self.shape)
     self.numel = math.prod(self.shape)
 
   def __repr__(self):return f'einShape{self.dims}'
@@ -52,7 +53,7 @@ class einShape:
   def inter (self, *others): return einShape(*[d for d in self.dims if all(d in o.dims for o in others)])
 
   def add(self, *dims): return einShape(*list(dict.fromkeys(self.dims + dims)))
-  def remove(self, *dims): return einShape(*[d for d in self.dims if d not in dims])
+  def diff(self, *dims): return einShape(*[d for d in self.dims if d not in dims])
 
   def __eq__(self, other): return self.dims == other.dims
 
@@ -62,9 +63,7 @@ class einShape:
 tensor_att = ['dtype', 'lazydata', 'numpy', 'shape', 'requires_grad']
 tensor_fns = ['backward']
 reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var', 'all', 'any']
-unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt']
-
-
+unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', "relu", 'exp']
 
 
 def create_generatator(fn):
@@ -76,6 +75,13 @@ def create_generatator(fn):
 fns = []
 
 class EinTensor():
+  def fromTensor(tensor:Tensor, *dims):
+    dims = dims + (-1,) * len(tensor.shape)
+    dims = [EinDim(t) if d==-1 else EinDim(d,t) if type(d) == str else d for [t,d] in zip(tensor.shape, dims)]
+
+    assert all(type(d) == EinDim for d in dims)
+    return EinTensor(dims, tensor)
+
   def __init__(self, shape:einShape, data:Tensor):
     if not isinstance(shape, einShape): shape = einShape(*shape)
     if not isinstance(data, Tensor): data = Tensor(data)
@@ -122,17 +128,26 @@ class EinTensor():
     order = [self.einshape.dims.index(k) for k in dims]
     return EinTensor(self.einshape.permute(order), self.data.permute(order))
 
-  def wrap_tensor(self, tensor):
-    if isinstance(tensor, Tensor) and tensor.shape == self.shape: return EinTensor(self.einshape, tensor)
-    return tensor
+  def wrap_tensor(self, arg):
+    if isinstance(arg, Tensor):
+      if arg.shape == self.shape: return EinTensor(self.einshape, arg)
+      return EinTensor.fromTensor(arg)
+    return arg
+
   def __getattribute__(self, name):
-    if name in tensor_att:return self.wrap_tensor(getattr(self.data, name))
+    if name in tensor_att:
+      return self.wrap_tensor(getattr(self.data, name))
     if name in tensor_fns:
       fn = getattr(self.data, name)
       def wrapper(*args, **kwargs):
         return self.wrap_tensor(fn(*args, **kwargs))
+      return wrapper
 
     return super().__getattribute__(name)
+
+  def sparse_categorical_crossentropy(self, y):
+    self = self.permute(*y.einshape.inter(self.einshape).dims, *self.einshape.diff(*y.einshape.dims).dims)
+    return EinTensor([], self.data.sparse_categorical_crossentropy(y.data))
 
   def clamp(self, min = None, max = None):
     if min is not None: self = self.maximum(min)
@@ -153,12 +168,9 @@ class EinTensor():
 
     def parsedims(dims, index):
       if index == (): return dims
-      if index[0] is None:
-        return (I, *parsedims(dims, index[1:]))
-      if type(index[0]) == int:
-        return parsedims(dims[1:], index[1:])
-      if type(index[0]) == slice:
-        return (None,) + parsedims(dims[1:], index[1:])
+      if index[0] is None: return (I, *parsedims(dims, index[1:]))
+      if type(index[0]) == int: return parsedims(dims[1:], index[1:])
+      if type(index[0]) == slice: return (None,) + parsedims(dims[1:], index[1:])
       raise ValueError(f"Invalid index {index}")
       
     newdata = self.data.__getitem__(index)
