@@ -74,6 +74,7 @@ def create_generatator(fn):
 
 fns = []
 
+
 class EinTensor():
   def fromTensor(tensor:Tensor, *dims):
     dims = dims + (-1,) * len(tensor.shape)
