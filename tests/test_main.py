@@ -65,9 +65,26 @@ class TestEinTensor(unittest.TestCase):
     assert x.dtype == x.data.dtype
     assert (x.numpy() == x.data.numpy()).all()
 
+  def test_stack(self):
+    St = EinDim("S2", 2)
+    s = x.stack(x, dim = St)
+    assert s.einshape == einShape(St, K, V)
 
-    
+    s = x.stack(y, dim= St)
+    self.assertEqual(s.einshape, einShape(St,K,V,S,T))
 
+    assert((s.sum(St) == (x+y)).all().numpy())
+
+
+  def test_getitem(self):
+    assert x[None].einshape.dims == (EinDim(1), *x.einshape.dims)
+    assert x[0].einshape.dims == x.einshape.dims[1:]
+    self.assertEqual(x[:2].einshape.dims ,(EinDim(2), *x.einshape.dims[1:]))
+
+  def test_tensor_attributes(self):
+    x = EinTensor.rand(K,V, requires_grad = True)
+    x.sum().backward()
+    self.assertEqual(x.grad.einshape, x.einshape)
 
 if __name__ == '__main__':
   unittest.main()

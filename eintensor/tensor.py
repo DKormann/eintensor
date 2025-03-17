@@ -1,10 +1,15 @@
 from tinygrad import Tensor
 from tinygrad.ops import SimpleMathTrait
 import math
+
 _dimensions = {}
 
 class EinDim:
-  def __init__ (self,name:str, size:int):
+  def __init__ (self,name:str, size:int=None):
+    if size == None:
+      assert type(name) == int, f'EinDim requires at least an int for size'
+      size = name
+      name = f'_{size}'
     if name in _dimensions:
       assert _dimensions[name] == size, f"Dimension {name} already exists with size {_dimensions[name]}"
     _dimensions[name] = size
@@ -22,7 +27,9 @@ class EinDim:
     while newname in _dimensions: newname = f'{self.name}_{ctr:=ctr+1}'
     return EinDim(newname, self.size)
 
-I = EinDim('1', 1)
+
+I = EinDim( 1)
+
 
 class einShape:
 
@@ -38,6 +45,9 @@ class einShape:
     assert len(order) == len(self.dims)
     return einShape(*[self.dims[i] for i in order])
 
+  def __iter__(self):
+    return (self.dims).__iter__()
+
   def union (self, *others): return einShape(*list(dict.fromkeys(sum([d.dims for d in [self, *others]], tuple()))))
   def inter (self, *others): return einShape(*[d for d in self.dims if all(d in o.dims for o in others)])
 
@@ -46,10 +56,15 @@ class einShape:
 
   def __eq__(self, other): return self.dims == other.dims
 
+
+
+
 tensor_att = ['dtype', 'lazydata', 'numpy', 'shape', 'requires_grad']
 tensor_fns = ['backward']
-reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var']
+reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var', 'all', 'any']
 unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt']
+
+
 
 
 def create_generatator(fn):
@@ -129,10 +144,28 @@ class EinTensor():
   @property
   def grad(self):
     g = self.data.grad
-    return g if g is None else EinTensor(self.shape, g)
-  
+    return g if g is None else EinTensor(self.einshape, g)
 
   def __matmul__(self, other): return (self * other).sum(*self.einshape.inter(other.einshape).dims)
+
+  def __getitem__(self, index):
+    if not isinstance(index,tuple):index = (index,)
+
+    def parsedims(dims, index):
+      if index == (): return dims
+      if index[0] is None:
+        return (I, *parsedims(dims, index[1:]))
+      if type(index[0]) == int:
+        return parsedims(dims[1:], index[1:])
+      if type(index[0]) == slice:
+        return (None,) + parsedims(dims[1:], index[1:])
+      raise ValueError(f"Invalid index {index}")
+      
+    newdata = self.data.__getitem__(index)
+    newdims = parsedims(self.einshape.dims, index)
+    newdims = [EinDim(a) if b is None else b if b.size == a else EinDim(a) for [a,b] in zip(newdata.shape, newdims)]
+
+    return EinTensor(einShape(*newdims), newdata)
 
 def create_elementwise(fn):
   def wrapped (one:EinTensor, other):
@@ -147,8 +180,7 @@ def create_elementwise(fn):
   return wrapped
 
 binary_ops = [op for op in SimpleMathTrait.__dict__ if op not in EinTensor.__dict__] \
-  + ['__pow__', 'minimum', 'maximum']
-
+  + ['__pow__', 'minimum', 'maximum', "__eq__"]
 
 for op in binary_ops:
   fn = getattr(Tensor, op)
@@ -168,16 +200,12 @@ for op in reduce_ops:
   setattr(EinTensor, op, create_reduce(getattr(Tensor, op)))
   setattr(EinTensor, f'{op}_to', create_reduce(getattr(Tensor, op), True))
 
+
 if __name__ == '__main__':
   K,V,S,T = EinDim('K', 3), EinDim('V', 5), EinDim('S', 7), EinDim('T', 11)
 
   Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
 
-  x = EinTensor.ones(Nsamples, Dim)
-  w = EinTensor.ones(Dim, Out)
-
-  print(x.stack(w))
-  print(x.stack(EinTensor.ones(Dim, Nsamples)))
-
-
+  x = EinTensor.ones(Dim, Nsamples, Out)
+  print(x[None])
 
