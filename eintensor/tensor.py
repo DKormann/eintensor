@@ -60,7 +60,7 @@ class einShape:
 
 
 
-tensor_att = ['dtype', 'lazydata', 'numpy', 'shape', 'requires_grad']
+tensor_att = ['dtype', 'device', 'lazydata', 'numpy', 'shape', 'requires_grad', "training"]
 tensor_fns = ['backward']
 reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var', 'all', 'any']
 unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', "relu", 'exp']
@@ -76,12 +76,15 @@ fns = []
 
 
 class EinTensor():
+
   def fromTensor(tensor:Tensor, *dims):
     dims = dims + (-1,) * len(tensor.shape)
     dims = [EinDim(t) if d==-1 else EinDim(d,t) if type(d) == str else d for [t,d] in zip(tensor.shape, dims)]
 
     assert all(type(d) == EinDim for d in dims)
     return EinTensor(dims, tensor)
+  
+
 
   def __init__(self, shape:einShape, data:Tensor):
     if not isinstance(shape, einShape): shape = einShape(*shape)
@@ -135,6 +138,11 @@ class EinTensor():
       return EinTensor.fromTensor(arg)
     return arg
 
+  def __setattribute__( name, value):
+    print(name, value)
+    if name == 'training': self.data.training = value
+    else: super().__setattr__(name, value)
+
   def __getattribute__(self, name):
     if name in tensor_att:
       return self.wrap_tensor(getattr(self.data, name))
@@ -149,6 +157,11 @@ class EinTensor():
   def sparse_categorical_crossentropy(self, y):
     self = self.permute(*y.einshape.inter(self.einshape).dims, *self.einshape.diff(*y.einshape.dims).dims)
     return EinTensor([], self.data.sparse_categorical_crossentropy(y.data))
+
+  def softmax(self, dim:EinDim = None):
+    if dim is None: dim = -1
+    else: dim = self.einshape.dims.index(dim)
+    return self.wrap_tensor(self.data.softmax(dim))
 
   def clamp(self, min = None, max = None):
     if min is not None: self = self.maximum(min)
@@ -179,6 +192,11 @@ class EinTensor():
     newdims = [EinDim(a) if b is None else b if b.size == a else EinDim(a) for [a,b] in zip(newdata.shape, newdims)]
 
     return EinTensor(einShape(*newdims), newdata)
+
+  @staticmethod
+  def settrain(x):
+    Tensor.training = x
+  
 
 def create_elementwise(fn):
   def wrapped (one:EinTensor, other):
