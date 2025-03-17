@@ -17,7 +17,7 @@ Classes = EinDim("NClasses", 10)
 
 class NN:
   def __init__(self):
-    self.w = EinTensor.rand(width, height, Classes)
+    self.w = EinTensor.rand(width, height, Classes, requires_grad = True)
   
   def forward(self, x):
     return self.w @ x
@@ -27,9 +27,8 @@ nn = NN()
 p = nn.forward(trainx)
 
 
-from tinygrad import nn, Tensor
-
-
 loss = p.sparse_categorical_crossentropy(trainy)
 
-print(loss)
+loss.backward()
+
+
