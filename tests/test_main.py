@@ -85,6 +85,20 @@ class TestEinTensor(unittest.TestCase):
     x = EinTensor.rand(K,V, requires_grad = True)
     x.sum().backward()
     self.assertEqual(x.grad.einshape, x.einshape)
+  
+  def test_tensor_reduce(self):
+    x = EinTensor.rand(K,V,S,T)
+    assert x.sum().einshape == einShape()
+    assert x.sum(K).einshape == einShape(V,S,T)
+    assert x.sum_to(K).einshape == einShape(K)
+
+    assert x.mean().einshape == einShape()
+    assert x.mean_to(K).einshape == einShape(K)
+    
+    assert x.argmin(K).einshape == einShape(V,S,T)
+    assert x.argmin_to(K,S).einshape == einShape(K,S)
+    assert x.argmin_to(S,K).einshape == einShape(S,K)
+
 
 if __name__ == '__main__':
   unittest.main()

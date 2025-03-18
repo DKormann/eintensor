@@ -2,8 +2,8 @@ from eintensor import EinTensor, EinDim
 import matplotlib.pyplot as plt
 from eintensor.nn import mnist
 from eintensor.nn import Adam
-
-import tinygrad
+from tinygrad import TinyJit
+import time
 
 trainx, trainy, testx, testy = mnist()
 Nsamples, width, height = trainx.einshape
@@ -12,12 +12,13 @@ Classes = EinDim("NClasses", 10)
 
 class NN:
   def __init__(self):
-    hdim = EinDim('hidden', 400)
-    self.w1 = EinTensor.rand(width, height, hdim, requires_grad = True) * 0.01
-    self.w2 = EinTensor.rand(hdim, Classes, requires_grad = True) * 0.01
+    hdim = EinDim('hidden', 200)
+    eps = 1/hdim.size
+    self.w1 = EinTensor.rand(width, height, hdim, requires_grad = True) * eps
+    self.w2 = EinTensor.rand(hdim, Classes, requires_grad = True) * eps
 
-  # @tinygrad.TinyJit
   def forward(self, x):
+    x = x.float()/255.
     x = (self.w1 @ x).relu()
     x = (self.w2 @ x)
     x = x.softmax(Classes)
@@ -35,10 +36,16 @@ def step():
   loss = p.sparse_categorical_crossentropy(trainy)
   loss.backward()
   opt.step()
-  return loss.numpy()
+
+  return p, loss.numpy()
 
 EinTensor.settrain(True)
 
-for i in range(10):
-  print(step())
+jitstep = TinyJit(step)
+
+for i in range(40):
+  p, res = jitstep()
+  if not i or (i+1) %10 == 0:
+    print(p.argmax(Nsamples))
+    print(res)
 

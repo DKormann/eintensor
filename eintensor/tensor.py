@@ -62,7 +62,7 @@ class einShape:
 
 tensor_att = ['dtype', 'device', 'lazydata', 'numpy', 'shape', 'requires_grad', "training"]
 tensor_fns = ['backward']
-reduce_ops = ['sum', 'mean', 'max', 'min', 'prod', 'std', 'var', 'all', 'any']
+reduce_ops = ['sum', 'mean', 'max', 'argmax', 'argmin', 'min', 'prod', 'std', 'var', 'all', 'any']
 unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', "relu", 'exp']
 
 
@@ -112,7 +112,7 @@ class EinTensor():
     tds = [t.expand(*newshape.dims).data.expand(newshape.shape) for t in tensors]
     return EinTensor(einShape(*((dim,) + newshape.dims)), Tensor.stack(*tds))
   
-  def __repr__(self): return f'<einTensor [{', '.join(map(lambda x: x.name, self.einshape.dims))}]>'
+  def __repr__(self): return f"<einTensor [{', '.join(map(lambda x: x.name, self.einshape.dims))}]>"
 
   def reshape(self, *einshape:tuple[EinDim]):
     einshape = einShape(*einshape)
@@ -222,9 +222,13 @@ for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x, *args: EinTe
 def create_reduce(fn, inverse = False):
   def wrapped (x, *axes:tuple[EinDim]):
     if len(axes) == 0: axes = x.einshape.dims
-    if inverse: axes = [d for d in x.einshape.dims if d not in axes]
-    return EinTensor(einShape(*[k for k in x.einshape.dims if k not in axes]),
-      fn(x.data, [x.einshape.dims.index(k) for k in axes]))
+    data = x.data
+    shp = x.einshape
+    for k in [d for d in x.einshape.dims if d not in axes] if inverse else axes:
+      data = fn(data, shp.dims.index(k))
+      shp = shp.diff(k)
+    res = EinTensor(shp, data)
+    return res.reshape(*axes) if inverse else res
   return wrapped
 
 for op in reduce_ops:
@@ -237,6 +241,4 @@ if __name__ == '__main__':
 
   Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
 
-  x = EinTensor.ones(Dim, Nsamples, Out)
-  print(x[None])
-
+  x = EinTensor.rand(Dim, Nsamples, Out)
