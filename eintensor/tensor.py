@@ -191,21 +191,19 @@ class EinTensor():
       if index[0] is None: return (I, *parsedims(dims, index[1:]))
       if type(index[0]) == int: return parsedims(dims[1:], index[1:])
       if type(index[0]) == slice: return (None,) + parsedims(dims[1:], index[1:])
+      if type(index[0]) == EinTensor: return parsedims(dims[1:], index[1:])
       raise ValueError(f"Invalid index {index}")
 
     newdata = self.data.__getitem__(tuple(i.data if isinstance(i, EinTensor) else i for i in index))
     big = einShape().union(*[i.einshape for i in index if isinstance(i, EinTensor)])
-    # print(big)
 
-    newdims = big.dims+ parsedims(self.einshape.dims, tuple(i for i in index if not isinstance(i, EinTensor)))
-
+    newdims = big.dims+ parsedims(self.einshape.dims, tuple(i for i in index))
     newdims = [EinDim(a) if b is None else b if b.size == a else EinDim(a) for [a,b] in zip(newdata.shape, newdims)]
 
     return EinTensor(einShape(*newdims), newdata)
 
   @staticmethod
-  def settrain(x):
-    Tensor.training = x
+  def settrain(x): Tensor.training = x
   
 
 def create_elementwise(fn):
@@ -258,6 +256,3 @@ if __name__ == '__main__':
 
   Ix = EinDim('Ix', 8)
   i = EinTensor([Ix], [1,2,3,4,5,6,7,8])
-
-  print(x[i,i, 0].numpy() == x.numpy()[i.numpy(), i.numpy(), 0])
-  print(x[i,0, i].numpy() == x.numpy()[i.numpy(), 0, i.numpy()])

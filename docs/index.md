@@ -75,7 +75,9 @@ reduce operations come in to flavors:
 
 `x.sum(K)` will sum along the  K dimension
 
-`x.sum_to(K,S)` will sum all other dimensions to get resulting dimension (K,) 
+`x.sum_to(K,S)` will sum all other dimensions to get resulting dimension (K,) <reduce>_to will work for all reduce operations
+
+supported reduce operations: [source](https://github.com/DKormann/eintensor/blob/a9e0501dde6f6792ed4c4d19bd45665de3bd4a2e/eintensor/tensor.py#L71)
 
 ### stack
 
@@ -91,6 +93,17 @@ EinTensor.stack(
 ```
 
 
+### indexing
+
+supports fancy indexing like 
+
+Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
+
+
+Ix = EinDim('Ix', 8)
+i = EinTensor([Ix], [1,2,3,4,5,6,7,8])
+
+EinTensor.rand(Dim, Nsamples, Out) [i,i, 0]
 
 
 [examples](https://github.com/dkormann/eintensor/tree/main/examples)

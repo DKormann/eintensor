@@ -95,6 +95,8 @@ class TestEinTensor(unittest.TestCase):
     assert (x[i,i, 0].numpy() == x.numpy()[i.numpy(), i.numpy(), 0]).all()
     assert (x[i,0, i].numpy() == x.numpy()[i.numpy(), 0, i.numpy()]).all()
 
+    self.assertEqual(x[i].einshape, einShape(Ix, Nsamples, Out))
+
   def test_tensor_attributes(self):
     x = EinTensor.rand(K,V, requires_grad = True)
     x.sum().backward()
