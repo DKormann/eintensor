@@ -77,9 +77,23 @@ class TestEinTensor(unittest.TestCase):
 
 
   def test_getitem(self):
+
     assert x[None].einshape.dims == (EinDim(1), *x.einshape.dims)
+
+    x[0]
     assert x[0].einshape.dims == x.einshape.dims[1:]
     self.assertEqual(x[:2].einshape.dims ,(EinDim(2), *x.einshape.dims[1:]))
+
+
+  def test_getitem_fancy(self):
+    Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
+    x = EinTensor.rand(Dim, Nsamples, Out)
+
+    Ix = EinDim('Ix', 8)
+    i = EinTensor([Ix], [1,2,3,4,5,6,7,8])
+
+    assert (x[i,i, 0].numpy() == x.numpy()[i.numpy(), i.numpy(), 0]).all()
+    assert (x[i,0, i].numpy() == x.numpy()[i.numpy(), 0, i.numpy()]).all()
 
   def test_tensor_attributes(self):
     x = EinTensor.rand(K,V, requires_grad = True)
@@ -98,6 +112,8 @@ class TestEinTensor(unittest.TestCase):
     assert x.argmin(K).einshape == einShape(V,S,T)
     assert x.argmin_to(K,S).einshape == einShape(K,S)
     assert x.argmin_to(S,K).einshape == einShape(S,K)
+  
+
 
 
 if __name__ == '__main__':

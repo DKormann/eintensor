@@ -52,6 +52,12 @@ class einShape:
   def union (self, *others): return einShape(*list(dict.fromkeys(sum([d.dims for d in [self, *others]], tuple()))))
   def inter (self, *others): return einShape(*[d for d in self.dims if all(d in o.dims for o in others)])
 
+  def broadcast(*shapes):
+    defs = [d for d in shapes if d is not None]
+    if len(defs) == 0: return shapes
+    big = defs[0].inter(*defs[1:])
+    return [big if d is None else d for d in shapes]
+
   def add(self, *dims): return einShape(*list(dict.fromkeys(self.dims + dims)))
   def diff(self, *dims): return einShape(*[d for d in self.dims if d not in dims])
 
@@ -62,7 +68,7 @@ class einShape:
 
 tensor_att = ['dtype', 'device', 'lazydata', 'numpy', 'shape', 'requires_grad', "training"]
 tensor_fns = ['backward']
-reduce_ops = ['sum', 'mean', 'max', 'argmax', 'argmin', 'min', 'prod', 'std', 'var', 'all', 'any']
+reduce_ops = ['sum', 'mean', 'max', 'min', 'argmax', 'argmin', 'prod', 'std', 'var', 'all', 'any']
 unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', "relu", 'exp']
 
 
@@ -89,7 +95,7 @@ class EinTensor():
   def __init__(self, shape:einShape, data:Tensor):
     if not isinstance(shape, einShape): shape = einShape(*shape)
     if not isinstance(data, Tensor): data = Tensor(data)
-    assert shape.shape == data.shape
+    assert shape.shape == data.shape, f"Shape {shape.shape} does not match data shape {data.shape}"
     self.einshape:einShape = shape
     self.data = data
 
@@ -186,9 +192,13 @@ class EinTensor():
       if type(index[0]) == int: return parsedims(dims[1:], index[1:])
       if type(index[0]) == slice: return (None,) + parsedims(dims[1:], index[1:])
       raise ValueError(f"Invalid index {index}")
-      
-    newdata = self.data.__getitem__(index)
-    newdims = parsedims(self.einshape.dims, index)
+
+    newdata = self.data.__getitem__(tuple(i.data if isinstance(i, EinTensor) else i for i in index))
+    big = einShape().union(*[i.einshape for i in index if isinstance(i, EinTensor)])
+    # print(big)
+
+    newdims = big.dims+ parsedims(self.einshape.dims, tuple(i for i in index if not isinstance(i, EinTensor)))
+
     newdims = [EinDim(a) if b is None else b if b.size == a else EinDim(a) for [a,b] in zip(newdata.shape, newdims)]
 
     return EinTensor(einShape(*newdims), newdata)
@@ -222,6 +232,9 @@ for op in unary_ops: setattr(EinTensor, op, (lambda name: lambda x, *args: EinTe
 def create_reduce(fn, inverse = False):
   def wrapped (x, *axes:tuple[EinDim]):
     if len(axes) == 0: axes = x.einshape.dims
+    if len(axes) == 1:
+      if type(axes[0]) == EinTensor: axes = (axes[0].einshape,)
+      if type(axes[0]) == einShape: axes = axes[0].dims
     data = x.data
     shp = x.einshape
     for k in [d for d in x.einshape.dims if d not in axes] if inverse else axes:
@@ -242,3 +255,9 @@ if __name__ == '__main__':
   Dim, Nsamples, Out = EinDim('Dim', 10), EinDim('Nsamples', 100), EinDim('Out', 20)
 
   x = EinTensor.rand(Dim, Nsamples, Out)
+
+  Ix = EinDim('Ix', 8)
+  i = EinTensor([Ix], [1,2,3,4,5,6,7,8])
+
+  print(x[i,i, 0].numpy() == x.numpy()[i.numpy(), i.numpy(), 0])
+  print(x[i,0, i].numpy() == x.numpy()[i.numpy(), 0, i.numpy()])

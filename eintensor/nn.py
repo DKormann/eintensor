@@ -4,6 +4,7 @@ from eintensor import EinTensor, EinDim
 
 class Adam:
   def __init__(self, weights: list[EinTensor], lr = 0.001):
+    for w in weights: w.requires_grad = True
     self.adam = optim.Adam([w.data for w in weights]
     , lr = lr)
   def step(self): return self.adam.step()

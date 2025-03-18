@@ -14,8 +14,8 @@ class NN:
   def __init__(self):
     hdim = EinDim('hidden', 200)
     eps = 1/hdim.size
-    self.w1 = EinTensor.rand(width, height, hdim, requires_grad = True) * eps
-    self.w2 = EinTensor.rand(hdim, Classes, requires_grad = True) * eps
+    self.w1 = EinTensor.rand(width, height, hdim) * eps
+    self.w2 = EinTensor.rand(hdim, Classes) * eps
 
   def forward(self, x):
     x = x.float()/255.
@@ -43,9 +43,12 @@ EinTensor.settrain(True)
 
 jitstep = TinyJit(step)
 
-for i in range(40):
-  p, res = jitstep()
+for i in range(1000):
   if not i or (i+1) %10 == 0:
-    print(p.argmax(Nsamples))
-    print(res)
+    p, res = jitstep()
+    pred = p.argmax_to(Nsamples)
+
+    vpred = nn.forward(testx).argmax_to(testy) == testy
+    
+    print(i, "acc:",(pred == trainy).mean().numpy())
 
