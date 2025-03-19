@@ -17,5 +17,9 @@ def mnist():
     EinTensor.fromTensor(ytest, 'Ntest'))
 
 
+def get_parameters(model):
+  return list(nn.state.get_state_dict(model, '', EinTensor).values())
+  
+
 
 

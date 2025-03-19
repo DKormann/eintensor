@@ -2,6 +2,7 @@ from eintensor import EinTensor, EinDim
 import matplotlib.pyplot as plt
 from eintensor.nn import mnist
 from eintensor.nn import Adam
+import eintensor
 from tinygrad import TinyJit
 import time
 
@@ -12,10 +13,12 @@ Classes = EinDim("NClasses", 10)
 
 class NN:
   def __init__(self):
-    hdim = EinDim('hidden', 200)
-    eps = 1/hdim.size
-    self.w1 = EinTensor.rand(width, height, hdim) * eps
-    self.w2 = EinTensor.rand(hdim, Classes) * eps
+    hdim = EinDim('hidden', 400)
+
+    self.w1 = EinTensor.randn(width, height, hdim)
+    self.w1 /= self.w1.einshape.numel
+    self.w2 = EinTensor.randn(hdim, Classes)
+    self.w2 /= self.w2.einshape.numel
 
   def forward(self, x):
     x = x.float()/255.
@@ -26,29 +29,46 @@ class NN:
 
 nn = NN()
 
-opt = Adam([
-  nn.w1,
-  nn.w2
-], lr = 0.01)
+
+opt = Adam(
+  eintensor.nn.get_parameters(nn)
+  
+  , lr = 0.001)
+
+BatchDim = EinDim('Batch', 100)
+
 
 def step():
-  p = nn.forward(trainx)
-  loss = p.sparse_categorical_crossentropy(trainy)
+
+  idx = EinTensor.randint(BatchDim, high=Nsamples.size)
+  x = trainx[idx]
+  y = trainy[idx]
+  p = nn.forward(x)
+  loss = p.sparse_categorical_crossentropy(y)
   loss.backward()
   opt.step()
 
   return p, loss.numpy()
 
-EinTensor.settrain(True)
-
+EinTensor.train(True)
 jitstep = TinyJit(step)
 
-for i in range(1000):
-  if not i or (i+1) %10 == 0:
-    p, res = jitstep()
-    pred = p.argmax_to(Nsamples)
+from tinygrad import Tensor
 
-    vpred = nn.forward(testx).argmax_to(testy) == testy
-    
-    print(i, "acc:",(pred == trainy).mean().numpy())
+
+@TinyJit
+def test():
+  p = nn.forward(testx)
+  acc = p.argmax(Classes).eq(testy).mean()
+  return acc
+
+
+it = 400
+
+for i in range(it):
+  p, loss = jitstep()
+
+  if not i or i % (it//10) ==0:
+    acc = test().item()
+    print(f"epoch {i} {acc=} loss {loss}")
 

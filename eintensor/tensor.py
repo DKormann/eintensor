@@ -66,7 +66,7 @@ class einShape:
 
 
 
-tensor_att = ['dtype', 'device', 'lazydata', 'numpy', 'shape', 'requires_grad', "training"]
+tensor_att = ['dtype', 'device', 'lazydata', 'numpy', 'item', 'tolist', 'shape', 'requires_grad', "training"]
 tensor_fns = ['backward']
 reduce_ops = ['sum', 'mean', 'max', 'min', 'argmax', 'argmin', 'prod', 'std', 'var', 'all', 'any']
 unary_ops = ['__neg__', 'abs', '__invert__', 'float', 'int', 'bool', 'sqrt', "relu", 'exp']
@@ -203,7 +203,7 @@ class EinTensor():
     return EinTensor(einShape(*newdims), newdata)
 
   @staticmethod
-  def settrain(x): Tensor.training = x
+  def train(x=True): Tensor.training = x
   
 
 def create_elementwise(fn):
